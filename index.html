@@ -120,7 +120,7 @@
   <aside>
     <div class="brand">
       <div class="eyebrow">Architecture Page</div>
-      <h1>Databricks Lineage Agent</h1>
+      <h1> Data Engineering Documentation Lineage Agent</h1>
       <p>Executive + technical system understanding for engine, LLM review, cache, outputs, and incremental runs.</p>
     </div>
     <nav>
@@ -139,8 +139,8 @@
   <main>
     <section class="hero" id="summary">
       <div class="kicker">Production lineage understanding page</div>
-      <h2>Evidence-backed Databricks lineage: deterministic engine first, LLM review second, runtime validation last.</h2>
-      <p class="lead">This page explains how the GitHub lineage engine scans Databricks notebooks, extracts source-to-target edges with <code>sqlglot</code> and Python/PySpark AST logic, writes auditable outputs, and then lets the LLM review layer focus only on changed, unresolved, or low-confidence work.</p>
+      <h2>Evidence-backed Data Engineering Documentation Agent: deterministic engine first, LLM review second, runtime validation last.</h2>
+      <p class="lead">This page explains how the GitHub lineage engine scans Repo files, extracts source-to-target edges with <code>sqlglot</code> and Python/PySpark AST logic, writes auditable outputs, and then lets the LLM review layer focus only on changed, unresolved, or low-confidence work.</p>
       <div class="grid four">
         <div class="stat"><div><div class="num">25</div><div class="label">Analyzed files</div></div><div class="note">Current output run: all 25 reused from scanner cache.</div></div>
         <div class="stat"><div><div class="num">58</div><div class="label">Engine edges</div></div><div class="note">Deterministic source → target draft from scanner.</div></div>
@@ -148,7 +148,7 @@
         <div class="stat"><div><div class="num">94%</div><div class="label">Pipeline coverage</div></div><div class="note">16 of 17 analyzable notebooks resolved; 1 DE flag remains.</div></div>
       </div>
       <div class="callout good">
-        <strong>One-line mental model:</strong> <code>.cache/</code> saves scanner runtime, <code>content_store/</code> saves LLM reading noise, <code>change_summary.md</code> saves review tokens, <code>llm_review_manifest.json</code> tells the LLM where to focus, and <code>llm_reviewed_edges.json</code> is the reviewed static lineage layer before Databricks runtime validation.
+        <strong>One-line mental model:</strong> <code>.cache/</code> saves scanner runtime, <code>content_store/</code> saves LLM reading noise, <code>change_summary.md</code> saves review tokens, <code>llm_review_manifest.json</code> tells the LLM where to focus, and <code>llm_reviewed_edges.json</code> is the reviewed static lineage layer If can be later confirmed by Databricks runtime validation.
       </div>
     </section>
 
@@ -165,7 +165,7 @@
           </defs>
           <rect x="20" y="35" width="165" height="130" rx="18" class="box" />
           <text x="42" y="70" class="title">Repository</text>
-          <text x="42" y="96" class="body">Databricks notebooks</text>
+          <text x="42" y="96" class="body">Databricks/Repo file</text>
           <text x="42" y="116" class="body">.py / .sql / .yml</text>
           <text x="42" y="136" class="body">configs + workflows</text>
 
