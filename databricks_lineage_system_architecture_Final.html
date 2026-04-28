@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Databricks Lineage Agent — Executive System Architecture & Workflow</title>
+  <style>
+    :root{
+      --ink:#0b0b0c;
+      --muted:#4b5563;
+      --subtle:#6b7280;
+      --line:#d9dde3;
+      --soft:#f6f7f9;
+      --soft2:#eef1f5;
+      --paper:#ffffff;
+      --dark:#111827;
+      --accent:#111111;
+      --ok:#0f5132;
+      --warn:#664d03;
+      --bad:#842029;
+      --blue:#1f3a5f;
+      --shadow:0 20px 50px rgba(17,24,39,.08);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      background:var(--paper);
+      color:var(--ink);
+      font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      line-height:1.55;
+    }
+    a{color:inherit;text-decoration:none;border-bottom:1px solid #a3a3a3}
+    code,kbd{font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;font-size:.92em;background:#f1f3f5;border:1px solid #e2e8f0;border-radius:6px;padding:.12rem .32rem}
+    .shell{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:100vh}
+    aside{
+      position:sticky;top:0;height:100vh;overflow:auto;border-right:1px solid var(--line);background:#fff;padding:26px 22px;
+    }
+    .brand{border-bottom:1px solid var(--line);padding-bottom:22px;margin-bottom:22px}
+    .brand .eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);font-weight:700}
+    .brand h1{font-size:24px;line-height:1.05;margin:8px 0 12px;letter-spacing:-.04em}
+    .brand p{font-size:13px;color:var(--muted);margin:0}
+    nav a{display:block;padding:9px 10px;margin:2px 0;border:0;border-radius:10px;color:#374151;font-size:14px}
+    nav a:hover{background:#f3f4f6;color:#000}
+    main{min-width:0}
+    section{padding:60px min(7vw,84px);border-bottom:1px solid var(--line)}
+    .hero{padding-top:72px;background:linear-gradient(180deg,#fff 0%,#fafafa 100%)}
+    .kicker{display:inline-flex;gap:8px;align-items:center;font-size:12px;text-transform:uppercase;letter-spacing:.16em;font-weight:800;color:#111;border:1px solid #111;border-radius:999px;padding:6px 10px;background:#fff}
+    h2{font-size:34px;letter-spacing:-.04em;line-height:1.08;margin:0 0 14px}
+    h3{font-size:22px;letter-spacing:-.025em;margin:0 0 10px}
+    h4{font-size:16px;margin:0 0 8px;letter-spacing:-.015em}
+    .hero h2{font-size:58px;max-width:980px;margin-top:20px}
+    .lead{font-size:19px;color:#2f3540;max-width:1050px;margin:0 0 28px}
+    .small{font-size:13px;color:var(--muted)}
+    .grid{display:grid;gap:18px}
+    .grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card{border:1px solid var(--line);background:#fff;border-radius:var(--radius);padding:20px;box-shadow:0 2px 0 rgba(0,0,0,.02)}
+    .card.shadow{box-shadow:var(--shadow)}
+    .stat{padding:20px;border:1px solid #cfd5dd;border-radius:18px;background:#fff;min-height:130px;display:flex;flex-direction:column;justify-content:space-between}
+    .stat .num{font-size:42px;font-weight:850;letter-spacing:-.06em;line-height:1;color:#050505}
+    .stat .label{font-weight:700;margin-top:12px}
+    .stat .note{font-size:12px;color:var(--muted);margin-top:4px}
+    .tag{display:inline-block;border:1px solid #c9ced6;border-radius:999px;padding:4px 9px;font-size:12px;color:#1f2937;background:#fff;margin:2px}
+    .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:7px 10px;background:#fff;font-size:12px;font-weight:700;color:#111}
+    .pill.ok{border-color:#a7d7bd;background:#f3fbf6;color:var(--ok)}
+    .pill.warn{border-color:#f0d68a;background:#fff9e8;color:var(--warn)}
+    .pill.bad{border-color:#f2b8b5;background:#fff5f5;color:var(--bad)}
+    .flow{display:flex;align-items:stretch;gap:12px;overflow:auto;padding:8px 2px 18px}
+    .node{min-width:190px;position:relative;border:1px solid #cfd5dd;border-radius:16px;background:#fff;padding:16px;box-shadow:0 8px 24px rgba(17,24,39,.05)}
+    .node:not(:last-child)::after{content:"→";position:absolute;right:-20px;top:50%;transform:translateY(-50%);font-size:24px;font-weight:800;color:#111;background:#fff;padding:0 3px}
+    .node .step{font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:800;color:#6b7280;margin-bottom:7px}
+    .node strong{display:block;font-size:15px;margin-bottom:6px}
+    .node p{margin:0;font-size:12px;color:#4b5563}
+    .lane{border:1px solid var(--line);border-radius:20px;overflow:hidden;background:#fff}
+    .lane-row{display:grid;grid-template-columns:190px 1fr;border-bottom:1px solid var(--line)}
+    .lane-row:last-child{border-bottom:0}
+    .lane-title{padding:18px;background:#f8f9fb;border-right:1px solid var(--line);font-weight:800}
+    .lane-body{padding:14px 16px}
+    .mini-flow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .mini-flow span{border:1px solid #d8dde5;border-radius:12px;background:#fff;padding:9px 11px;font-size:13px}
+    .mini-flow b{font-size:18px}
+    .matrix{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#fff}
+    .matrix th,.matrix td{padding:13px 14px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left;font-size:13px}
+    .matrix th{background:#f5f6f8;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#374151}
+    .matrix tr:last-child td{border-bottom:0}
+    .matrix td:first-child{font-weight:800;white-space:nowrap}
+    .callout{border-left:5px solid #111;background:#fafafa;border-radius:14px;padding:18px 20px;margin:22px 0}
+    .callout.warn{border-left-color:#946200;background:#fffaf0}
+    .callout.good{border-left-color:#0f5132;background:#f4fbf7}
+    .bar-wrap{display:grid;gap:14px}
+    .bar-row{display:grid;grid-template-columns:240px 1fr 90px;gap:14px;align-items:center}
+    .bar-label{font-weight:700;font-size:13px}
+    .bar-track{height:20px;border:1px solid #cfd5dd;border-radius:999px;background:#f8fafc;overflow:hidden}
+    .bar{height:100%;background:#111;border-radius:999px}
+    .bar.light{background:#6b7280}
+    .bar.ok{background:#0f5132}
+    .money{font-variant-numeric:tabular-nums;font-weight:800;text-align:right}
+    .svgbox{border:1px solid var(--line);border-radius:22px;background:#fff;box-shadow:var(--shadow);padding:18px;overflow:auto}
+    svg text{font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif}
+    .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    .legend span{font-size:12px;color:#374151;display:flex;gap:6px;align-items:center}
+    .dot{width:10px;height:10px;border-radius:50%;display:inline-block;background:#111}.dot.grey{background:#64748b}.dot.open{background:#fff;border:1px solid #111}.dot.green{background:#0f5132}.dot.orange{background:#946200}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+    .tab{border:1px solid #cfd5dd;background:#fff;border-radius:999px;padding:9px 14px;font-weight:800;font-size:13px;cursor:pointer}
+    .tab.active{background:#111;color:#fff;border-color:#111}
+    .tab-panel{display:none}.tab-panel.active{display:block}
+    .mono-block{font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;background:#0f1115;color:#f9fafb;border-radius:16px;padding:16px;overflow:auto;font-size:12px;line-height:1.55}
+    .note-list{padding-left:18px;margin:8px 0 0}.note-list li{margin:6px 0;color:#374151}
+    .tight p{margin:4px 0}
+    .footer{padding:40px min(7vw,84px);font-size:12px;color:#6b7280;background:#fafafa}
+    @media(max-width:1050px){.shell{grid-template-columns:1fr}aside{position:relative;height:auto;border-right:0;border-bottom:1px solid var(--line)}nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}.hero h2{font-size:42px}.grid.two,.grid.three,.grid.four{grid-template-columns:1fr}.lane-row{grid-template-columns:1fr}.lane-title{border-right:0;border-bottom:1px solid var(--line)}.bar-row{grid-template-columns:1fr}.money{text-align:left}}
+    @media print{aside{display:none}.shell{display:block}section{break-inside:avoid;padding:34px 0}.hero h2{font-size:36px}.card,.svgbox{box-shadow:none}.flow{overflow:visible;flex-wrap:wrap}.node:not(:last-child)::after{display:none}body{font-size:12px}}
+  </style>
+</head>
+<body>
+<div class="shell">
+  <aside>
+    <div class="brand">
+      <div class="eyebrow">Architecture Page</div>
+      <h1>Databricks Lineage Agent</h1>
+      <p>Executive + technical system understanding for engine, LLM review, cache, outputs, and incremental runs.</p>
+    </div>
+    <nav>
+      <a href="#summary">1. Executive Snapshot</a>
+      <a href="#hld">2. HLD Architecture</a>
+      <a href="#lld">3. LLD Engine Workflow</a>
+      <a href="#scenarios">4. First vs Second Call</a>
+      <a href="#llm">5. LLM Review Logic</a>
+      <a href="#outputs">6. Output Influence Map</a>
+      <a href="#cache">7. Cache & SHA Model</a>
+      <a href="#cost">8. Cost & Token Analysis</a>
+      <a href="#readiness">9. Readiness & Risks</a>
+    </nav>
+  </aside>
+
+  <main>
+    <section class="hero" id="summary">
+      <div class="kicker">Production lineage understanding page</div>
+      <h2>Evidence-backed Databricks lineage: deterministic engine first, LLM review second, runtime validation last.</h2>
+      <p class="lead">This page explains how the GitHub lineage engine scans Databricks notebooks, extracts source-to-target edges with <code>sqlglot</code> and Python/PySpark AST logic, writes auditable outputs, and then lets the LLM review layer focus only on changed, unresolved, or low-confidence work.</p>
+      <div class="grid four">
+        <div class="stat"><div><div class="num">25</div><div class="label">Analyzed files</div></div><div class="note">Current output run: all 25 reused from scanner cache.</div></div>
+        <div class="stat"><div><div class="num">58</div><div class="label">Engine edges</div></div><div class="note">Deterministic source → target draft from scanner.</div></div>
+        <div class="stat"><div><div class="num">33</div><div class="label">Scanner unresolved items</div></div><div class="note">Mostly partial/read-only audit SQL; reviewed by LLM.</div></div>
+        <div class="stat"><div><div class="num">94%</div><div class="label">Pipeline coverage</div></div><div class="note">16 of 17 analyzable notebooks resolved; 1 DE flag remains.</div></div>
+      </div>
+      <div class="callout good">
+        <strong>One-line mental model:</strong> <code>.cache/</code> saves scanner runtime, <code>content_store/</code> saves LLM reading noise, <code>change_summary.md</code> saves review tokens, <code>llm_review_manifest.json</code> tells the LLM where to focus, and <code>llm_reviewed_edges.json</code> is the reviewed static lineage layer before Databricks runtime validation.
+      </div>
+    </section>
+
+    <section id="hld">
+      <h2>HLD — End-to-End System Architecture</h2>
+      <p class="lead">At a high level, this is not just a document generator. It is a two-stage lineage system: a deterministic scanner creates structured evidence, then an LLM agent performs targeted investigation and writes reviewed lineage decisions.</p>
+      <div class="svgbox">
+        <svg width="1180" height="420" viewBox="0 0 1180 420" role="img" aria-label="High level architecture diagram">
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#111" /></marker>
+            <style>
+              .box{fill:#fff;stroke:#111;stroke-width:1.4}.soft{fill:#f6f7f9;stroke:#111;stroke-width:1.1}.title{font-size:16px;font-weight:800;fill:#111}.body{font-size:12px;fill:#374151}.tiny{font-size:11px;fill:#4b5563}.line{stroke:#111;stroke-width:1.5;marker-end:url(#arrow)}.dash{stroke:#64748b;stroke-width:1.2;stroke-dasharray:6 5;marker-end:url(#arrow)}
+            </style>
+          </defs>
+          <rect x="20" y="35" width="165" height="130" rx="18" class="box" />
+          <text x="42" y="70" class="title">Repository</text>
+          <text x="42" y="96" class="body">Databricks notebooks</text>
+          <text x="42" y="116" class="body">.py / .sql / .yml</text>
+          <text x="42" y="136" class="body">configs + workflows</text>
+
+          <rect x="235" y="35" width="180" height="130" rx="18" class="soft" />
+          <text x="257" y="70" class="title">Orchestrator</text>
+          <text x="257" y="96" class="body">run_lineage_agent.py</text>
+          <text x="257" y="116" class="body">creates venv</text>
+          <text x="257" y="136" class="body">installs requirements</text>
+
+          <rect x="465" y="35" width="230" height="130" rx="18" class="box" />
+          <text x="487" y="70" class="title">Deterministic Scanner</text>
+          <text x="487" y="96" class="body">run_lineage_scan.py</text>
+          <text x="487" y="116" class="body">sqlglot SQL AST</text>
+          <text x="487" y="136" class="body">Python/PySpark AST</text>
+
+          <rect x="750" y="35" width="185" height="130" rx="18" class="soft" />
+          <text x="772" y="70" class="title">Evidence Outputs</text>
+          <text x="772" y="96" class="body">lineage_edges.json</text>
+          <text x="772" y="116" class="body">unresolved_items.json</text>
+          <text x="772" y="136" class="body">content_index.json</text>
+
+          <rect x="985" y="35" width="175" height="130" rx="18" class="box" />
+          <text x="1007" y="70" class="title">LLM Review</text>
+          <text x="1007" y="96" class="body">verify / correct</text>
+          <text x="1007" y="116" class="body">discover missed edges</text>
+          <text x="1007" y="136" class="body">write review log</text>
+
+          <line x1="185" y1="100" x2="235" y2="100" class="line" />
+          <line x1="415" y1="100" x2="465" y2="100" class="line" />
+          <line x1="695" y1="100" x2="750" y2="100" class="line" />
+          <line x1="935" y1="100" x2="985" y2="100" class="line" />
+
+          <rect x="465" y="235" width="230" height="130" rx="18" class="soft" />
+          <text x="487" y="270" class="title">Runtime Optimization</text>
+          <text x="487" y="296" class="body">.cache/ records</text>
+          <text x="487" y="316" class="body">file_sha256 + config</text>
+          <text x="487" y="336" class="body">skip unchanged files</text>
+
+          <rect x="750" y="235" width="185" height="130" rx="18" class="box" />
+          <text x="772" y="270" class="title">Clean Content</text>
+          <text x="772" y="296" class="body">content_store/*.txt</text>
+          <text x="772" y="316" class="body">normalized notebook text</text>
+          <text x="772" y="336" class="body">chunk metadata</text>
+
+          <rect x="985" y="235" width="175" height="130" rx="18" class="soft" />
+          <text x="1007" y="270" class="title">Reviewed Output</text>
+          <text x="1007" y="296" class="body">llm_reviewed_edges</text>
+          <text x="1007" y="316" class="body">llm_review_log</text>
+          <text x="1007" y="336" class="body">candidate/validated static</text>
+
+          <line x1="580" y1="165" x2="580" y2="235" class="dash" />
+          <line x1="695" y1="300" x2="750" y2="300" class="line" />
+          <line x1="935" y1="300" x2="985" y2="300" class="line" />
+          <line x1="1072" y1="165" x2="1072" y2="235" class="dash" />
+        </svg>
+      </div>
+      <div class="legend"><span><i class="dot"></i> Data/control flow</span><span><i class="dot grey"></i> Optimization/support flow</span><span><i class="dot open"></i> Human/LLM-readable artifact</span></div>
+    </section>
+
+    <section id="lld">
+      <h2>LLD — Deterministic Engine Workflow</h2>
+      <p class="lead">The scanner is the evidence layer. It does deterministic parsing, generates hashes, creates cache records, builds normalized content, extracts edges, and writes the files that the LLM uses for review.</p>
+      <div class="flow" aria-label="Low level engine workflow">
+        <div class="node"><div class="step">01</div><strong>Load config</strong><p><code>load_config()</code> reads analyzable extensions, ignore rules, evidence limits, and confidence thresholds.</p></div>
+        <div class="node"><div class="step">02</div><strong>Discover files</strong><p><code>discover()</code> separates analyzed files, inventoried files, and ignored files.</p></div>
+        <div class="node"><div class="step">03</div><strong>Hash source</strong><p><code>file_sha256()</code> calculates raw file hash for change detection and cache keying.</p></div>
+        <div class="node"><div class="step">04</div><strong>Cache lookup</strong><p><code>cache_key()</code> uses engine version + file hash + config + sqlglot availability.</p></div>
+        <div class="node"><div class="step">05</div><strong>Analyze file</strong><p><code>analyze_file()</code> parses notebooks, SQL, Python, YAML metadata, and PySpark calls.</p></div>
+        <div class="node"><div class="step">06</div><strong>Store content</strong><p><code>store_content()</code> writes normalized text to <code>content_store/</code> and returns content records.</p></div>
+        <div class="node"><div class="step">07</div><strong>Extract lineage</strong><p><code>extract_sql()</code> and <code>PySparkVisitor</code> produce probable or partial edges.</p></div>
+        <div class="node"><div class="step">08</div><strong>Write outputs</strong><p><code>write_outputs()</code> writes JSON, CSV, markdown, change summary, and LLM manifest.</p></div>
+      </div>
+
+      <div class="grid two">
+        <div class="card shadow">
+          <h3>SQL path</h3>
+          <div class="mini-flow"><span>SQL cell / <code>spark.sql()</code></span><b>→</b><span><code>sqlglot.parse(..., read="databricks")</code></span><b>→</b><span>source tables</span><b>→</b><span>target tables</span><b>→</b><span><code>LineageEdge</code></span></div>
+          <ul class="note-list">
+            <li>Targets are detected from <code>CREATE</code>, <code>INSERT</code>, <code>MERGE</code>, and <code>UPDATE</code>.</li>
+            <li>All table references except target tables are treated as sources.</li>
+            <li>Complete source + target gives <code>probable</code> status with scanner confidence around <code>0.92</code>.</li>
+            <li>Only source or only target becomes a <code>partial</code> edge for LLM review.</li>
+          </ul>
+        </div>
+        <div class="card shadow">
+          <h3>PySpark path</h3>
+          <div class="mini-flow"><span>Python AST</span><b>→</b><span>track string variables</span><b>→</b><span><code>.table()</code> reads</span><b>→</b><span><code>.saveAsTable()</code> writes</span><b>→</b><span>edges/unresolved</span></div>
+          <ul class="note-list">
+            <li>Static string assignments are stored so simple dynamic table variables can be resolved.</li>
+            <li>Unresolved dynamic calls are written to <code>unresolved_items.json</code>.</li>
+            <li>Path-based <code>.load()</code>/<code>.save()</code> is marked for Databricks/Unity Catalog validation.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="scenarios">
+      <h2>Two Run Scenarios — First Call vs Second Call</h2>
+      <p class="lead">The system behaves differently on the first full scan and later incremental scans. This is the heart of the cost/time saving design.</p>
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="first">Scenario 1 — First call / full scan</button>
+        <button class="tab" data-tab="second">Scenario 2 — Second call / incremental scan</button>
+      </div>
+
+      <div id="first" class="tab-panel active">
+        <div class="card shadow">
+          <h3>First call: create the baseline</h3>
+          <p>Use <code>--full-scan</code> when the repo has not been scanned/reviewed before or when engine/config changes require a clean baseline.</p>
+          <div class="flow">
+            <div class="node"><div class="step">Run</div><strong>Orchestrator starts</strong><p>Creates runtime venv, installs requirements, appends audit events.</p></div>
+            <div class="node"><div class="step">Scan</div><strong>All analyzable files parsed</strong><p>No previous cache should be trusted for review baseline.</p></div>
+            <div class="node"><div class="step">Evidence</div><strong>Edges + unresolved created</strong><p>Writes deterministic files and normalized content records.</p></div>
+            <div class="node"><div class="step">Review</div><strong>LLM reads manifest queue</strong><p>High/medium items opened through content index/store.</p></div>
+            <div class="node"><div class="step">Output</div><strong>LLM review baseline</strong><p>Writes reviewed, corrected, discovered, resolved, rejected decisions.</p></div>
+          </div>
+          <div class="callout">
+            <strong>First-run LLM rule:</strong> even engine-confident files should be sampled or reviewed because there is no previous LLM review baseline for this repository. The engine creates the first draft; the LLM creates the first reviewed static lineage set.
+          </div>
+        </div>
+      </div>
+
+      <div id="second" class="tab-panel">
+        <div class="card shadow">
+          <h3>Second call: reuse baseline and inspect only change</h3>
+          <p>The current supplied output is this type of run: <strong>incremental</strong>, <strong>25 analyzed files unchanged</strong>, and <strong>25 files reused from cache</strong>.</p>
+          <div class="flow">
+            <div class="node"><div class="step">Hash</div><strong>Recalculate current file SHA</strong><p>Each candidate file gets a fresh raw SHA.</p></div>
+            <div class="node"><div class="step">Cache</div><strong>Find same cache key</strong><p>If engine version + file SHA + config + sqlglot match, reuse cached analysis.</p></div>
+            <div class="node"><div class="step">Diff</div><strong>Write change summary</strong><p>Shows added, changed, removed, unchanged, and inventoried changes.</p></div>
+            <div class="node"><div class="step">Review</div><strong>LLM applies incremental policy</strong><p>Changed/added files open; unchanged files carry forward prior review.</p></div>
+            <div class="node"><div class="step">Result</div><strong>No unnecessary deep reads</strong><p>Previous reviewed edges remain valid unless source changed.</p></div>
+          </div>
+          <div class="grid three">
+            <div class="card"><h4>Current scan result</h4><p><strong>0</strong> analyzed files changed.</p><p><strong>25</strong> analyzed files unchanged and cached.</p></div>
+            <div class="card"><h4>Inventoried changes</h4><p><strong>2</strong> changed inventoried files: <code>.github/copilot-instructions.md</code> and <code>agent_flow.txt</code>.</p></div>
+            <div class="card"><h4>LLM action</h4><p>Carry forward existing reviewed lineage; only review changed inventoried documentation/config if selected.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="llm">
+      <h2>How the LLM Review Layer Works</h2>
+      <p class="lead">The LLM is not asked to blindly read the repository. It is given a precise queue and a file-opening contract. This keeps the review focused, auditable, and cheaper.</p>
+      <div class="lane">
+        <div class="lane-row"><div class="lane-title">Triage order</div><div class="lane-body"><div class="mini-flow"><span><code>lineage_report.md</code></span><b>→</b><span><code>change_summary.md</code></span><b>→</b><span><code>llm_review_manifest.json</code></span><b>→</b><span>previous LLM outputs</span><b>→</b><span><code>lineage_edges.json</code></span><b>→</b><span><code>unresolved_items.json</code></span></div></div></div>
+        <div class="lane-row"><div class="lane-title">Opening rule</div><div class="lane-body">For analyzed files, open <code>review_queue[].content_store_path</code> or map exact <code>file_path</code> through <code>content_index.json</code>. For inventoried files, open the raw repo path only when selected.</div></div>
+        <div class="lane-row"><div class="lane-title">Incremental rule</div><div class="lane-body">If a file is unchanged and previous review exists, carry forward the previous decision. Do not reopen content just because old unresolved items still exist.</div></div>
+        <div class="lane-row"><div class="lane-title">Status rule</div><div class="lane-body"><span class="tag">probable = engine evidence</span><span class="tag">candidate = LLM-found static evidence</span><span class="tag">llm_reviewed = LLM reviewed scanner edge</span><span class="tag">confirmed = only after Databricks runtime / Unity Catalog validation</span></div></div>
+      </div>
+      <div class="grid three" style="margin-top:18px">
+        <div class="card"><h3>High priority</h3><p>Unresolved items, analysis errors, parser failures, and unsafe partials. The LLM opens full normalized content and traces the logic manually.</p></div>
+        <div class="card"><h3>Medium priority</h3><p>Zero-edge files, low confidence, partial edges, temp-view chains, or unqualified table names. The LLM verifies whether lineage was missed or correctly absent.</p></div>
+        <div class="card"><h3>Low priority</h3><p>Unchanged files and workflow/config references. On incremental runs, these are mostly carry-forward unless the previous review is missing or incomplete.</p></div>
+      </div>
+    </section>
+
+    <section id="outputs">
+      <h2>Output Influence Map — What Creates What, and Who Uses It</h2>
+      <p class="lead">This matrix is the go-to operating guide for understanding how the engine output files help the LLM and how the second run becomes cheaper.</p>
+      <table class="matrix">
+        <thead><tr><th>Artifact</th><th>Created by</th><th>Contains</th><th>Engine value</th><th>LLM / second-run value</th></tr></thead>
+        <tbody>
+          <tr><td><code>.cache/*.json</code></td><td><code>run_lineage_scan.py</code></td><td>Cached <code>result</code> + <code>content_record</code> for one file version.</td><td>Skips parse/extract/store work for unchanged files.</td><td>LLM should not read directly; it indirectly enables accurate incremental outputs.</td></tr>
+          <tr><td><code>content_store/*.txt</code></td><td><code>store_content()</code></td><td>Clean normalized text from notebooks/code.</td><td>Preserves source evidence used during scan.</td><td>LLM reads clean code instead of noisy raw <code>.ipynb</code> JSON.</td></tr>
+          <tr><td><code>content_index.json</code></td><td><code>write_outputs()</code></td><td>Maps <code>file_path → content_store_path</code>, hashes, line counts, chunks.</td><td>Official index of normalized content.</td><td>LLM opens exact content path; never guesses hash filenames.</td></tr>
+          <tr><td><code>lineage_edges.json</code></td><td><code>extract_sql()</code>, <code>PySparkVisitor</code>, <code>dedupe_edges()</code></td><td>Deterministic source → target edges with evidence and confidence.</td><td>Main machine-readable scanner result.</td><td>Starting draft for LLM review; prevents extracting everything from scratch.</td></tr>
+          <tr><td><code>unresolved_items.json</code></td><td>SQL/PySpark analyzers</td><td>Dynamic SQL, partial edges, parser failures, unresolved reads/writes.</td><td>Marks unsafe or incomplete extraction cases.</td><td>Points the LLM to issues, but does not alone decide file opening.</td></tr>
+          <tr><td><code>change_summary.md</code></td><td><code>previous_manifest()</code> + <code>write_outputs()</code></td><td>Added, removed, changed, unchanged, cached, inventoried changes.</td><td>Documents incremental behavior.</td><td>Primary token-saving gate for second run.</td></tr>
+          <tr><td><code>llm_review_manifest.json</code></td><td><code>build_llm_review_manifest()</code></td><td>Review queue, priority, reasons, content paths, change status.</td><td>Converts scan facts into review plan.</td><td>LLM priority queue: what to open, what to carry forward.</td></tr>
+          <tr><td><code>llm_reviewed_edges.json</code></td><td>LLM review layer</td><td>Reviewed/candidate/corrected/resolved decisions.</td><td>Not used by scanner to extract edges.</td><td>Previous baseline for incremental carry-forward.</td></tr>
+          <tr><td><code>llm_review_log.md</code></td><td>LLM review layer</td><td>File-by-file reasoning, rejected false positives, DE flags.</td><td>Not used for parsing.</td><td>Explains why previous review remains valid or what changed.</td></tr>
+          <tr><td><code>audit_log.jsonl</code></td><td>Orchestrator + scanner</td><td>Execution events: start, install, scanner run, outputs written, finish.</td><td>Traceability/debugging; avoids blind reruns.</td><td>LLM can verify execution status, not lineage mappings.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="cache">
+      <h2>Cache, Hashes, and Incremental Correctness</h2>
+      <p class="lead">The engine separates raw file change detection from normalized content change detection. This is why metadata-only notebook changes do not force the LLM to reread irrelevant notebook JSON noise.</p>
+      <div class="grid two">
+        <div class="card shadow">
+          <h3>Cache key model</h3>
+          <div class="mono-block">cache_key = sha256(
+  engine_version
+  + file_sha256
+  + config
+  + sqlglot_available
+)</div>
+          <ul class="note-list">
+            <li><code>file_sha256</code> is the raw source file hash.</li>
+            <li><code>text_sha256</code> / <code>content_sha256</code> is the normalized readable text hash.</li>
+            <li>Cache files are content-versioned; old cache files can remain without corrupting current output.</li>
+          </ul>
+        </div>
+        <div class="card shadow">
+          <h3>Metadata-only notebook change</h3>
+          <div class="flow" style="padding-bottom:0">
+            <div class="node"><div class="step">Raw</div><strong><code>file_sha256</code> changes</strong><p>Notebook JSON metadata changed.</p></div>
+            <div class="node"><div class="step">Clean</div><strong><code>content_sha256</code> same</strong><p>Extracted code text is unchanged.</p></div>
+            <div class="node"><div class="step">Review</div><strong>LLM can skip deep read</strong><p>Use change summary + previous review.</p></div>
+          </div>
+        </div>
+      </div>
+      <div class="callout warn">
+        <strong>Important:</strong> <code>.cache/</code> is scanner memory, not LLM evidence. The LLM should use <code>change_summary.md</code>, <code>llm_review_manifest.json</code>, <code>lineage_edges.json</code>, <code>unresolved_items.json</code>, <code>content_index.json</code>, and <code>content_store/</code>.
+      </div>
+    </section>
+
+    <section id="cost">
+      <h2>Cost & Token Analysis — Visual Estimate</h2>
+      <p class="lead">The supplied output files allow a concrete estimate of review scale. Token counts below use the standard rough approximation <strong>1 token ≈ 4 characters</strong>. Pricing uses OpenAI GPT-5.4 mini standard rates shown in the official API pricing page at the time this page was prepared: <strong>$0.75 / 1M input tokens</strong>, <strong>$0.075 / 1M cached input tokens</strong>, and <strong>$4.50 / 1M output tokens</strong>.</p>
+      <div class="grid three">
+        <div class="card"><h3>Clean content volume</h3><p class="statline"><strong>122,337 chars</strong> ≈ <strong>30.6K tokens</strong></p><p class="small">Total normalized <code>content_store/</code> text in provided output.</p></div>
+        <div class="card"><h3>Review triage volume</h3><p class="statline"><strong>111,204 chars</strong> ≈ <strong>27.8K tokens</strong></p><p class="small">Report + change summary + manifest + previous LLM reviewed edge/log baseline.</p></div>
+        <div class="card"><h3>Current scan reuse</h3><p class="statline"><strong>25 / 25 cached</strong></p><p class="small">Current incremental run avoided re-analysis of all analyzable files.</p></div>
+      </div>
+      <div class="card shadow" style="margin-top:18px">
+        <h3>Estimated LLM review cost by run type</h3>
+        <div class="bar-wrap">
+          <div class="bar-row"><div class="bar-label">Naive full review every run</div><div class="bar-track"><div class="bar" style="width:100%"></div></div><div class="money">~$0.08</div></div>
+          <div class="bar-row"><div class="bar-label">Incremental, no analyzed file changed</div><div class="bar-track"><div class="bar light" style="width:42%"></div></div><div class="money">~$0.03</div></div>
+          <div class="bar-row"><div class="bar-label">Incremental, one notebook changed</div><div class="bar-track"><div class="bar ok" style="width:58%"></div></div><div class="money">~$0.05</div></div>
+        </div>
+        <p class="small" style="margin-top:14px">Assumptions: first/full review ≈ 50K input + 10K output tokens; no-change incremental ≈ 28K input + 3K output tokens; one-changed-file incremental ≈ 33K input + 5K output tokens. Actual cost depends on model, prompt design, output length, and whether prompt caching is active.</p>
+      </div>
+      <div class="grid two" style="margin-top:18px">
+        <div class="card">
+          <h3>Where savings come from</h3>
+          <ul class="note-list">
+            <li><strong>Scanner runtime:</strong> <code>.cache/</code> skips notebook parsing, SQL parsing, AST traversal, content-store generation, and edge reconstruction for unchanged files.</li>
+            <li><strong>LLM input tokens:</strong> <code>change_summary.md</code> and <code>llm_review_manifest.json</code> prevent reopening unchanged content.</li>
+            <li><strong>LLM reasoning time:</strong> <code>llm_reviewed_edges.json</code> and <code>llm_review_log.md</code> become the carry-forward baseline.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Practical enterprise interpretation</h3>
+          <p>For this repository size, LLM cost is already low. The more important enterprise benefit is <strong>deterministic repeatability</strong>: every review can explain which files changed, which edges were reused, which unresolved items were rejected, and which notebook still needs Data Engineering action.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="readiness">
+      <h2>Production Readiness, Findings, and Next Steps</h2>
+      <div class="grid two">
+        <div class="card shadow">
+          <h3>Current readiness verdict</h3>
+          <p><span class="pill ok">Strong static lineage baseline</span> <span class="pill warn">Runtime confirmation still required</span></p>
+          <ul class="note-list">
+            <li>Engine version reported by scan output: <code>0.6.0</code>.</li>
+            <li>SQL parser available: <code>True</code>.</li>
+            <li>LLM review found that most unresolved scanner items were false positives from read-only audit queries, metadata refresh, or pre-load truncation.</li>
+            <li>Do not mark lineage as <code>confirmed</code> until Databricks runtime / Unity Catalog validation verifies the mappings.</li>
+          </ul>
+        </div>
+        <div class="card shadow">
+          <h3>Data Engineering action items</h3>
+          <ul class="note-list">
+            <li><strong>TXN_TREATMENT_SFHC:</strong> review missing <code>INSERT INTO com_de_hub.txn_treatment_sfhc</code>. The notebook has a bare <code>SELECT</code>, plus <code>TRUNCATE</code> and <code>OPTIMIZE</code>, but no static write operation.</li>
+            <li><strong>Single-cell multi-statement SQL:</strong> split <code>TRUNCATE</code>, <code>CREATE TEMP VIEW</code>, and <code>INSERT INTO</code> into separate cells/statements where possible to improve deterministic parsing.</li>
+            <li><strong>SERVER_LOG_TOILET_FINDER:</strong> clean commented-out comma style that causes <code>sqlglot</code> parse failure.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card shadow" style="margin-top:18px">
+        <h3>Final system takeaway for technical stakeholders</h3>
+        <p>This system should be positioned as an <strong>auditable static lineage accelerator</strong>. The scanner creates deterministic evidence. The LLM performs focused reasoning only where static parsing is weak. The second run is efficient because the engine cache avoids repeated parsing and the LLM carry-forward policy avoids repeated content review. The final enterprise control is runtime validation against Databricks Unity Catalog or another approved production lineage source.</p>
+      </div>
+    </section>
+
+    <div class="footer">
+      Prepared from the supplied <code>.github</code> engine ZIP, <code>lineage-output</code> ZIP, and DOCX notes. Pricing reference used for the cost section: <a href="https://openai.com/api/pricing/">OpenAI API Pricing</a>. This HTML file is self-contained and uses no external JavaScript libraries.
+    </div>
+  </main>
+</div>
+
+<script>
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>
